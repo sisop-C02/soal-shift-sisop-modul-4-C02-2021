@@ -109,7 +109,7 @@ static char * vigenere_cipher(char * str)
   return str;
 }
 
-static void en_de_crypt_21(char * str)
+static void en_de_crypt_12(char * str, bool with_rot)
 {
   char item_name[PATH_MAX];
   strcpy(item_name, str);
@@ -129,7 +129,9 @@ static void en_de_crypt_21(char * str)
     }
 
     str[i] = atbash_cipher(str[i]);
-    str[i] = rot_13_cipher(str[i]);
+    if (with_rot) {
+      str[i] = rot_13_cipher(str[i]);
+    }
   }
 }
 
@@ -178,7 +180,15 @@ static void pass_path(char * path, char * fpath)
       char child_path[PATH_MAX];
       split_path(temp_path, child_path, "RX_");
 
-      en_de_crypt_21(child_path);
+      en_de_crypt_12(child_path, true);
+      sprintf(fpath, "%s%s%s", dirpath, temp_path, child_path);
+    } else if (is_encrypted(path, "/AtoZ_")) {
+      char temp_path[PATH_MAX];
+      strcpy(temp_path, path);
+      char child_path[PATH_MAX];
+      split_path(temp_path, child_path, "AtoZ_");
+
+      en_de_crypt_12(child_path, false);
       sprintf(fpath, "%s%s%s", dirpath, temp_path, child_path);
     } else {
       sprintf(fpath, "%s%s", dirpath, path);
@@ -261,7 +271,14 @@ static int xmp_readdir(const char * path, void * buf, fuse_fill_dir_t filler, of
       char item_name[PATH_MAX];
       strcpy(item_name, de->d_name);
 
-      en_de_crypt_21(item_name);
+      en_de_crypt_12(item_name, true);
+
+      res = (filler(buf, item_name, &st, 0));
+    } else if (is_encrypted(path, "/AtoZ_")) {
+      char item_name[PATH_MAX];
+      strcpy(item_name, de->d_name);
+
+      en_de_crypt_12(item_name, false);
 
       res = (filler(buf, item_name, &st, 0));
     } else {
