@@ -27,8 +27,16 @@ static const char *dirpath = "/home/maroqi/Downloads";
 
 static int xmp_getattr(const char *path, struct stat *stbuf)
 {
+	printf("getattr:\n");
+	printf("%s\n", path);
   char fpath[PATH_MAX];
-  sprintf(fpath, "%s%s", dirpath, path);
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
 
 	int res;
 	res = lstat(fpath, stbuf);
@@ -41,8 +49,19 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 
 static int xmp_access(const char *path, int mask)
 {
+	printf("access:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+
 	int res;
-	res = access(path, mask);
+	res = access(fpath, mask);
 	if (res == -1) {
 		return -errno;
   }
@@ -52,8 +71,19 @@ static int xmp_access(const char *path, int mask)
 
 static int xmp_readlink(const char *path, char *buf, size_t size)
 {
+	printf("readlink:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+
 	int res;
-	res = readlink(path, buf, size - 1);
+	res = readlink(fpath, buf, size - 1);
 	if (res == -1) {
 		return -errno;
   }
@@ -69,12 +99,16 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	(void) offset;
 	(void) fi;
 
+	printf("readdir:\n");
+	printf("%s\n", path);
   char fpath[PATH_MAX];
+
   if (strcmp(path, "/") == 0) {
     sprintf(fpath, "%s", dirpath);
   } else {
     sprintf(fpath, "%s%s", dirpath, path);
   }
+	printf("%s\n", fpath);
 
 	DIR *dp;
 	dp = opendir(fpath);
@@ -99,16 +133,27 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 {
+	printf("mknod:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+
 	int res;
 	if (S_ISREG(mode)) {
-		res = open(path, O_CREAT | O_EXCL | O_WRONLY, mode);
+		res = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
 		if (res >= 0) {
 			res = close(res);
     }
 	} else if (S_ISFIFO(mode)) {
-		res = mkfifo(path, mode);
+		res = mkfifo(fpath, mode);
   } else {
-		res = mknod(path, mode, rdev);
+		res = mknod(fpath, mode, rdev);
   }
 
 	if (res == -1) {
@@ -120,8 +165,19 @@ static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int xmp_mkdir(const char *path, mode_t mode)
 {
+	printf("mkdir:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+
 	int res;
-	res = mkdir(path, mode);
+	res = mkdir(fpath, mode);
 	if (res == -1) {
 		return -errno;
   }
@@ -131,8 +187,19 @@ static int xmp_mkdir(const char *path, mode_t mode)
 
 static int xmp_unlink(const char *path)
 {
+	printf("unlink:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+
 	int res;
-	res = unlink(path);
+	res = unlink(fpath);
 	if (res == -1) {
 		return -errno;
   }
@@ -142,8 +209,19 @@ static int xmp_unlink(const char *path)
 
 static int xmp_rmdir(const char *path)
 {
+	printf("rmdir:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+
 	int res;
-	res = rmdir(path);
+	res = rmdir(fpath);
 	if (res == -1) {
 		return -errno;
   }
@@ -153,8 +231,27 @@ static int xmp_rmdir(const char *path)
 
 static int xmp_symlink(const char *from, const char *to)
 {
+	printf("symlink:\n");
+	printf("%s\n", from);
+  char fpath[PATH_MAX];
+
+  if (strcmp(from, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, from);
+  }
+	printf("%s\n", fpath);
+
+  char dpath[PATH_MAX];
+
+  if (strcmp(to, "/") == 0) {
+    sprintf(dpath, "%s", dirpath);
+  } else {
+    sprintf(dpath, "%s%s", dirpath, to);
+  }
+
 	int res;
-	res = symlink(from, to);
+	res = symlink(fpath, dpath);
 	if (res == -1) {
 		return -errno;
   }
@@ -164,8 +261,27 @@ static int xmp_symlink(const char *from, const char *to)
 
 static int xmp_rename(const char *from, const char *to)
 {
+	printf("rename:\n");
+	printf("%s\n", from);
+  char fpath[PATH_MAX];
+
+  if (strcmp(from, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, from);
+  }
+	printf("%s\n", fpath);
+
+  char dpath[PATH_MAX];
+
+  if (strcmp(to, "/") == 0) {
+    sprintf(dpath, "%s", dirpath);
+  } else {
+    sprintf(dpath, "%s%s", dirpath, to);
+  }
+
 	int res;
-	res = rename(from, to);
+	res = rename(fpath, dpath);
 	if (res == -1) {
 		return -errno;
   }
@@ -175,8 +291,27 @@ static int xmp_rename(const char *from, const char *to)
 
 static int xmp_link(const char *from, const char *to)
 {
+	printf("link:\n");
+	printf("%s\n", from);
+  char fpath[PATH_MAX];
+
+  if (strcmp(from, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, from);
+  }
+	printf("%s\n", fpath);
+
+  char dpath[PATH_MAX];
+
+  if (strcmp(to, "/") == 0) {
+    sprintf(dpath, "%s", dirpath);
+  } else {
+    sprintf(dpath, "%s%s", dirpath, to);
+  }
+
 	int res;
-	res = link(from, to);
+	res = link(fpath, dpath);
 	if (res == -1) {
 		return -errno;
   }
@@ -186,8 +321,19 @@ static int xmp_link(const char *from, const char *to)
 
 static int xmp_chmod(const char *path, mode_t mode)
 {
+	printf("chmod:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+
 	int res;
-	res = chmod(path, mode);
+	res = chmod(fpath, mode);
 	if (res == -1) {
 		return -errno;
   }
@@ -197,8 +343,19 @@ static int xmp_chmod(const char *path, mode_t mode)
 
 static int xmp_chown(const char *path, uid_t uid, gid_t gid)
 {
+	printf("chown:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+	
 	int res;
-	res = lchown(path, uid, gid);
+	res = lchown(fpath, uid, gid);
 	if (res == -1) {
 		return -errno;
   }
@@ -208,8 +365,19 @@ static int xmp_chown(const char *path, uid_t uid, gid_t gid)
 
 static int xmp_truncate(const char *path, off_t size)
 {
+	printf("truncate:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+	
 	int res;
-	res = truncate(path, size);
+	res = truncate(fpath, size);
 	if (res == -1) {
 		return -errno;
   }
@@ -219,8 +387,19 @@ static int xmp_truncate(const char *path, off_t size)
 
 static int xmp_open(const char *path, struct fuse_file_info *fi)
 {
+	printf("open:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+	
 	int res;
-	res = open(path, fi->flags);
+	res = open(fpath, fi->flags);
 	if (res == -1) {
 		return -errno;
   }
@@ -233,13 +412,16 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
 		    struct fuse_file_info *fi)
 {
 	(void) fi;
-
+	printf("read:\n");
+	printf("%s\n", path);
   char fpath[PATH_MAX];
+
   if (strcmp(path, "/") == 0) {
     sprintf(fpath, "%s", dirpath);
   } else {
     sprintf(fpath, "%s%s", dirpath, path);
   }
+	printf("%s\n", fpath);
 
 	int fd;
 	fd = open(fpath, O_RDONLY);
@@ -261,13 +443,16 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 		     off_t offset, struct fuse_file_info *fi)
 {
 	(void) fi;
-
+	printf("write:\n");
+	printf("%s\n", path);
   char fpath[PATH_MAX];
+
   if (strcmp(path, "/") == 0) {
     sprintf(fpath, "%s", dirpath);
   } else {
     sprintf(fpath, "%s%s", dirpath, path);
   }
+	printf("%s\n", fpath);
 
 	int fd;
 	fd = open(fpath, O_WRONLY);
@@ -287,8 +472,19 @@ static int xmp_write(const char *path, const char *buf, size_t size,
 
 static int xmp_statfs(const char *path, struct statvfs *stbuf)
 {
+	printf("symlink:\n");
+	printf("%s\n", path);
+  char fpath[PATH_MAX];
+
+  if (strcmp(path, "/") == 0) {
+    sprintf(fpath, "%s", dirpath);
+  } else {
+    sprintf(fpath, "%s%s", dirpath, path);
+  }
+	printf("%s\n", fpath);
+
 	int res;
-	res = statvfs(path, stbuf);
+	res = statvfs(fpath, stbuf);
 	if (res == -1)
 		return -errno;
 

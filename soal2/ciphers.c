@@ -48,78 +48,50 @@ static char rot_13_cipher(char ch)
   return ch;
 }
 
-static char * vignere_cipher(char * str, bool decode)
+static void en_de_crypt_21(char * str, bool is_file)
 {
-  char * key = "SISOP";
-  char new_key[strlen(str)];
+  char item_name[PATH_MAX];
+  strcpy(item_name, str);
+  char ext[PATH_MAX];
+  printf("pass 2\n");
 
-  for(int i = 0, j = 0; i < strlen(str); i++, j++) {
-    if (j == strlen(key)) {
-      j = 0;
-    }
-
-    new_key[i] = key[j];
+  if (is_file) {
+    strcpy(ext, strchr(item_name, '.'));
+    item_name[strlen(item_name) - (strlen(ext))] = '\0';
   }
+  printf("pass 3\n");
 
-  for(int i = 0; i < strlen(str); ++i) {
-    if(!isalpha(str[i])) { 
+  for (int i = strlen(item_name) - 1; i >= 0; i--) {
+    if(!isalpha(item_name[i])) {
       continue;
     }
 
-    char ch;
-    if (isupper(str[i])) {
-      ch = 'A';
-    } else {
-      ch = 'a';
-    }
-
-    if (!decode) {
-      str[i] = ((str[i] + new_key[i]) % 26) + ch;
-    } else {
-      str[i] = (((str[i] - new_key[i]) + 26) % 26) + ch;
-    }
+    item_name[i] = atbash_cipher(item_name[i]);
+    item_name[i] = rot_13_cipher(item_name[i]);
   }
+  printf("pass 4\n");
 
-  return str;
+  if (is_file) {
+    strcat(item_name, ext);
+  }
+  printf("pass 5\n");
+  printf("in %s\n", item_name);
+  strcpy(str, item_name);
 }
 
 void main ()
 {
   char path[PATH_MAX];
   scanf("%s", path);
+  char * fpath = path;
 
-  char first[PATH_MAX];
-  strcpy(first, path);
-  char second[PATH_MAX];
-  strcpy(second, path);
-  for (int i = strlen(first) - 1; i >= 0; i--) {
-    if (first[i] == '/') {
-      break;
-    }
-
-    if(!isalpha(first[i])) { 
-      continue;
-    }
-
-    first[i] = atbash_cipher(first[i]);
-    first[i] = rot_13_cipher(first[i]);
-  }
-  printf("%s\n", first);
-  printf("%s\n", vignere_cipher(path, false));
-  printf("%s\n", second);
-
-  for (int i = strlen(first) - 1; i >= 0; i--) {
-    if (first[i] == '/') {
-      break;
-    }
-
-    if(!isalpha(first[i])) { 
-      continue;
-    }
-
-    first[i] = atbash_cipher(first[i]);
-    first[i] = rot_13_cipher(first[i]);
-  }
-  printf("%s\n", first);
-  printf("%s\n", vignere_cipher(vignere_cipher(second, false), true));
+  char new_path[PATH_MAX];
+  strcpy(new_path, path);
+  printf("pass 1\n");
+  en_de_crypt_21(new_path, true);
+  printf("pass 6\n");
+  printf("%s\n", new_path);
+  en_de_crypt_21(new_path, true);
+  printf("pass 7\n");
+  printf("%s\n", new_path);
 }
