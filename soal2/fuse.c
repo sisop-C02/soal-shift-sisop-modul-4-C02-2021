@@ -85,6 +85,30 @@ static char rot_13_cipher(char ch)
   return ch;
 }
 
+static char * vigenere_cipher(char * str)
+{
+  char * key = "SISOP";
+  char new_key[strlen(str)];
+
+  for(int i = 0, j = 0; i < strlen(str); i++, j++) {
+    if (j == strlen(key)) {
+      j = 0;
+    }
+
+    new_key[i] = key[j];
+  }
+
+  for(int i = 0; i < strlen(str); ++i) {
+    if(!isalpha(str[i])) {
+      continue;
+    }
+    
+    str[i] = ((str[i] + new_key[i]) % 26) + 'A';
+  }
+
+  return str;
+}
+
 static void en_de_crypt_21(char * str)
 {
   char item_name[PATH_MAX];
@@ -118,7 +142,7 @@ static bool is_encrypted(char * path, char * by)
   return false;
 }
 
-static void path_after(char * parent, char * child, char * by)
+static void split_path(char * parent, char * child, char * by)
 {
   char fpath[PATH_MAX];
   strcpy(fpath, parent);
@@ -143,12 +167,8 @@ static void path_after(char * parent, char * child, char * by)
   parent[marker] = '\0';
 }
 
-static int xmp_getattr(const char *path, struct stat *stbuf)
+static void pass_path(char * path, char * fpath)
 {
-	printf("getattr:\n");
-	printf("%s\n", path);
-
-  char fpath[PATH_MAX];
   if (strcmp(path, "/") == 0) {
     sprintf(fpath, "%s", dirpath);
   } else {
@@ -156,7 +176,7 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
       char temp_path[PATH_MAX];
       strcpy(temp_path, path);
       char child_path[PATH_MAX];
-      path_after(temp_path, child_path, "RX_");
+      split_path(temp_path, child_path, "RX_");
 
       en_de_crypt_21(child_path);
       sprintf(fpath, "%s%s%s", dirpath, temp_path, child_path);
@@ -164,6 +184,15 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
       sprintf(fpath, "%s%s", dirpath, path);
     }
   }
+}
+
+static int xmp_getattr(const char *path, struct stat *stbuf)
+{
+	printf("getattr:\n");
+	printf("%s\n", path);
+
+  char fpath[PATH_MAX];
+  pass_path(path, fpath);
 
 	printf("%s\n", fpath);
 
@@ -173,6 +202,27 @@ static int xmp_getattr(const char *path, struct stat *stbuf)
 		return -errno;
   }
 
+  write_log("INFO", "GETATTR", path, "");
+	return 0;
+}
+
+static int xmp_access(const char *path, int mask)
+{
+	printf("access:\n");
+	printf("%s\n", path);
+
+  char fpath[PATH_MAX];
+  pass_path(path, fpath);
+
+	printf("%s\n", fpath);
+
+	int res;
+	res = access(fpath, mask);
+	if (res == -1) {
+		return -errno;
+  }
+
+  write_log("INFO", "ACCESS", path, "");
 	return 0;
 }
 
@@ -184,32 +234,8 @@ static int xmp_readdir(const char * path, void * buf, fuse_fill_dir_t filler, of
 	printf("readdir:\n");
 	printf("%s\n", path);
 
-  bool encrypted = false;
-  char * ret_parent_path = strstr(path, "/RX_");
-  if (ret_parent_path) {
-    encrypted = true;
-  }
-
   char fpath[PATH_MAX];
-  if (strcmp(path, "/") == 0) {
-    sprintf(fpath, "%s", dirpath);
-  } else {
-    if (encrypted) {
-      char temp_path[PATH_MAX];
-      strcpy(temp_path, path);
-      char child_path[PATH_MAX];
-      path_after(temp_path, child_path, "RX_");
-
-      // if (strlen(child_path) == 0) {
-      //   encrypted = false;
-      // }
-
-      en_de_crypt_21(child_path);
-      sprintf(fpath, "%s%s%s", dirpath, temp_path, child_path);
-    } else {
-      sprintf(fpath, "%s%s", dirpath, path);
-    }
-  }
+  pass_path(path, fpath);
 
 	printf("%s\n", fpath);
 
@@ -231,13 +257,11 @@ static int xmp_readdir(const char * path, void * buf, fuse_fill_dir_t filler, of
     st.st_mode = de->d_type << 12;
 
     int res = 0;
-    if (encrypted) {
+    if (is_encrypted(path, "/RX_")) {
       char item_name[PATH_MAX];
       strcpy(item_name, de->d_name);
 
       en_de_crypt_21(item_name);
-
-	    printf("%s\n", item_name);
 
       res = (filler(buf, item_name, &st, 0));
     } else {
@@ -250,7 +274,116 @@ static int xmp_readdir(const char * path, void * buf, fuse_fill_dir_t filler, of
   }
 
   closedir(dp);
+  write_log("INFO", "READDIR", path, "");
   return 0;
+}
+
+static int xmp_readlink(const char *path, char *buf, size_t size)
+{
+	printf("readlink:\n");
+	printf("%s\n", path);
+
+  char fpath[PATH_MAX];
+  pass_path(path, fpath);
+
+	printf("%s\n", fpath);
+
+	int res;
+	res = readlink(fpath, buf, size - 1);
+	if (res == -1) {
+		return -errno;
+  }
+	buf[res] = '\0';
+
+  write_log("INFO", "READLINK", path, "");
+	return 0;
+}
+
+static int xmp_symlink(const char *from, const char *to)
+{
+	printf("symlink:\n");
+	printf("%s\n", from);
+
+  char fpath[PATH_MAX];
+  pass_path(from, fpath);
+  
+	printf("%s\n", fpath);
+
+  char dpath[PATH_MAX];
+  pass_path(to, dpath);
+
+	int res;
+	res = symlink(fpath, dpath);
+	if (res == -1) {
+		return -errno;
+  }
+
+  write_log("INFO", "SYMLINK", from, to);
+	return 0;
+}
+
+static int xmp_link(const char *from, const char *to)
+{
+	printf("link:\n");
+	printf("%s\n", from);
+
+  char fpath[PATH_MAX];
+  pass_path(from, fpath);
+  
+	printf("%s\n", fpath);
+
+  char dpath[PATH_MAX];
+  pass_path(to, dpath);
+
+	int res;
+	res = link(fpath, dpath);
+	if (res == -1) {
+		return -errno;
+  }
+
+  write_log("INFO", "LINK", from, to);
+	return 0;
+}
+
+static int xmp_truncate(const char *path, off_t size)
+{
+	printf("truncate:\n");
+	printf("%s\n", path);
+  
+  char fpath[PATH_MAX];
+  pass_path(path, fpath);
+
+	printf("%s\n", fpath);
+	
+	int res;
+	res = truncate(fpath, size);
+	if (res == -1) {
+		return -errno;
+  }
+
+  write_log("INFO", "TRUNCATE", path, "");
+	return 0;
+}
+
+static int xmp_open(const char *path, struct fuse_file_info *fi)
+{
+	printf("open:\n");
+	printf("%s\n", path);
+
+  char fpath[PATH_MAX];
+  pass_path(path, fpath);
+
+	printf("%s\n", fpath);
+	
+	int res;
+	res = open(fpath, fi->flags);
+	if (res == -1) {
+		return -errno;
+  }
+
+	close(res);
+  write_log("INFO", "OPEN", path, "");
+	return 0;
 }
 
 static int xmp_read(const char * path, char * buf, size_t size, off_t offset, struct fuse_file_info * fi)
@@ -261,21 +394,7 @@ static int xmp_read(const char * path, char * buf, size_t size, off_t offset, st
 	printf("%s\n", path);
 
   char fpath[PATH_MAX];
-  if (strcmp(path, "/") == 0) {
-    sprintf(fpath, "%s", dirpath);
-  } else {
-    if (is_encrypted(path, "/RX_")) {
-      char temp_path[PATH_MAX];
-      strcpy(temp_path, path);
-      char child_path[PATH_MAX];
-      path_after(temp_path, child_path, "RX_");
-
-      en_de_crypt_21(child_path);
-      sprintf(fpath, "%s%s%s", dirpath, temp_path, child_path);
-    } else {
-      sprintf(fpath, "%s%s", dirpath, path);
-    }
-  }
+  pass_path(path, fpath);
 
 	printf("%s\n", fpath);
 
@@ -292,6 +411,7 @@ static int xmp_read(const char * path, char * buf, size_t size, off_t offset, st
   }
 
   close(fd);
+  write_log("INFO", "READ", path, "");
   return res;
 }
 
@@ -301,11 +421,7 @@ static int xmp_mkdir(const char * path, mode_t mode)
 	printf("%s\n", path);
 
   char fpath[PATH_MAX];
-  if (strcmp(path, "/") == 0) {
-    sprintf(fpath, "%s", dirpath);
-  } else {
-    sprintf(fpath, "%s%s", dirpath, path);
-  }
+  pass_path(path, fpath);
 
 	printf("%s\n", fpath);
 
@@ -316,49 +432,51 @@ static int xmp_mkdir(const char * path, mode_t mode)
   }
 
   write_log("INFO", "MKDIR", path, "");
-
 	return 0;
 }
 
-static char * vigenere_cipher(char * str)
+static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 {
-  char * key = "SISOP";
-  char new_key[strlen(str)];
+	printf("mknod:\n");
+	printf("%s\n", path);
 
-  for(int i = 0, j = 0; i < strlen(str); i++, j++) {
-    if (j == strlen(key)) {
-      j = 0;
+  char fpath[PATH_MAX];
+  pass_path(path, fpath);
+
+	printf("%s\n", fpath);
+
+	int res;
+	if (S_ISREG(mode)) {
+		res = open(fpath, O_CREAT | O_EXCL | O_WRONLY, mode);
+		if (res >= 0) {
+			res = close(res);
     }
-
-    new_key[i] = key[j];
+	} else if (S_ISFIFO(mode)) {
+		res = mkfifo(fpath, mode);
+  } else {
+		res = mknod(fpath, mode, rdev);
   }
 
-  for(int i = 0; i < strlen(str); ++i) {
-    if(!isalpha(str[i])) {
-      continue;
-    }
-    
-    str[i] = ((str[i] + new_key[i]) % 26) + 'A';
+	if (res == -1) {
+		return -errno;
   }
 
-  return str;
+  write_log("INFO", "MKNOD", path, "");
+	return 0;
 }
 
 static int xmp_rename(const char * from, const char * to)
 {
+	printf("rename:\n");
+	printf("%s\n", from);
+
   char fpath[PATH_MAX];
-  if (strcmp(from, "/") == 0) {
-    sprintf(fpath, "%s", dirpath);
-  } else {
-    sprintf(fpath, "%s%s", dirpath, from);
-  }
+  pass_path(from, fpath);
+
+	printf("%s\n", fpath);
 
   char dpath[PATH_MAX];
-  if (strcmp(to, "/") == 0) {
-    sprintf(dpath, "%s", dirpath);
-  } else {
-    sprintf(dpath, "%s%s", dirpath, to);
-  }
+  pass_path(to, dpath);
 
   int res;
   res = rename(fpath, dpath);
@@ -366,17 +484,19 @@ static int xmp_rename(const char * from, const char * to)
     return -errno;
   }
 
+  write_log("INFO", "RENAME", from, to);
 	return 0;
 }
 
 static int xmp_unlink(const char * path)
 {
+	printf("unlink:\n");
+	printf("%s\n", path);
+
   char fpath[PATH_MAX];
-  if (strcmp(path, "/") == 0) {
-    sprintf(fpath, "%s", dirpath);
-  } else {
-    sprintf(fpath, "%s%s", dirpath, path);
-  }
+  pass_path(path, fpath);
+
+	printf("%s\n", fpath);
 
 	int res;
 	res = unlink(fpath);
@@ -384,17 +504,19 @@ static int xmp_unlink(const char * path)
 		return -errno;
   }
 
+  write_log("WARNING", "UNLINK", path, "");
 	return 0;
 }
 
 static int xmp_rmdir(const char * path)
 {
+	printf("rmdir:\n");
+	printf("%s\n", path);
+
   char fpath[PATH_MAX];
-  if (strcmp(path, "/") == 0) {
-    sprintf(fpath, "%s", dirpath);
-  } else {
-    sprintf(fpath, "%s%s", dirpath, path);
-  }
+  pass_path(path, fpath);
+
+	printf("%s\n", fpath);
 
 	int res;
 	res = rmdir(fpath);
@@ -402,16 +524,24 @@ static int xmp_rmdir(const char * path)
 		return -errno;
   }
 
+  write_log("WARNING", "RMDIR", path, "");
 	return 0;
 }
 
 static struct fuse_operations xmp_oper = {
+  .access   = xmp_access,
   .getattr  = xmp_getattr,
+  .link     = xmp_link,
   .mkdir    = xmp_mkdir,
+  .mknod    = xmp_mknod,
+  .open     = xmp_open,
   .read     = xmp_read,
   .readdir  = xmp_readdir,
+  .readlink = xmp_readlink,
 	.rename		= xmp_rename,
 	.rmdir		= xmp_rmdir,
+  .symlink  = xmp_symlink,
+  .truncate = xmp_truncate,
 	.unlink		= xmp_unlink,
 };
 
