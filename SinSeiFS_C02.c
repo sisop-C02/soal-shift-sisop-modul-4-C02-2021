@@ -109,12 +109,8 @@ static char * vigenere_cipher(char * str)
   return str;
 }
 
-static void en_de_crypt_12(char * str, bool with_rot)
+static void en_de_crypt_12_file(char * str, bool with_rot)
 {
-  char item_name[PATH_MAX];
-  strcpy(item_name, str);
-  char ext[PATH_MAX];
-
   int size = strlen(str);
   for (int i = strlen(str); i >= 0; i--) {
     if (str[i] == '.') {
@@ -133,6 +129,68 @@ static void en_de_crypt_12(char * str, bool with_rot)
       str[i] = rot_13_cipher(str[i]);
     }
   }
+}
+
+static void en_de_crypt_12_dir(char * str, bool with_rot)
+{
+  char fpath[PATH_MAX];
+  strcpy(fpath, str);
+  char * substr = strtok(fpath, "/");
+  char dpath[PATH_MAX];
+
+  int counter = 0;
+  int marker = 0;
+  bool is_special = false;
+  while(substr != NULL) {
+    dpath[counter] = '/';
+    counter++;
+
+    if (!strncmp(substr, "A_is_a_", 7) || is_special) {
+      is_special = true;
+      for (int i = 0; i < strlen(substr); i++) {
+        dpath[counter + i] = substr[i];
+      }
+    } else {
+      int size = strlen(substr);
+      for (int i = size; i >= 0; i--) {
+        if (substr[i] == '.') {
+          size = i;
+          break;
+        }
+      }
+
+      for (int i = 0; i < size; i++) {
+        if(!isalpha(substr[i])) {
+          dpath[counter + i] = substr[i];
+          continue;
+        }
+
+        dpath[counter + i] = atbash_cipher(substr[i]);
+        if (with_rot) {
+          dpath[counter + i] = rot_13_cipher(substr[i]);
+        }
+      }
+
+      if (size != strlen(substr)) {
+        for (int i = size; i < strlen(substr); i++) {
+          dpath[counter + i] = substr[i];
+        }
+      }
+    }
+
+    counter += strlen(substr);
+
+    if (is_special && strncmp(substr, "A_is_a_", 7)) {
+      is_special = false;
+    }
+
+    if (substr != NULL) {
+      substr = strtok(NULL, "/");
+    }
+  }
+
+  dpath[counter] = '\0';
+  strcpy(str, dpath);
 }
 
 static bool is_encrypted(char * path, char * by)
@@ -181,7 +239,7 @@ static void pass_path(char * path, char * fpath, bool with_check)
         char child_path[PATH_MAX];
         split_path(temp_path, child_path, "RX_");
 
-        en_de_crypt_12(child_path, true);
+        en_de_crypt_12_dir(child_path, true);
         sprintf(fpath, "%s%s%s", dirpath, temp_path, child_path);
       } else if (is_encrypted(path, "/AtoZ_")) {
         char temp_path[PATH_MAX];
@@ -189,7 +247,7 @@ static void pass_path(char * path, char * fpath, bool with_check)
         char child_path[PATH_MAX];
         split_path(temp_path, child_path, "AtoZ_");
 
-        en_de_crypt_12(child_path, false);
+        en_de_crypt_12_dir(child_path, false);
         sprintf(fpath, "%s%s%s", dirpath, temp_path, child_path);
       } else {
         sprintf(fpath, "%s%s", dirpath, path);
@@ -198,6 +256,31 @@ static void pass_path(char * path, char * fpath, bool with_check)
       sprintf(fpath, "%s%s", dirpath, path);
     }
   }
+}
+
+static void get_last_item(char * path, char * item)
+{
+  int marker = 0;
+  for (int i = strlen(path); i >= 0; i--) {
+    if (path[i] == '/') {
+      marker = i;
+      break;
+    }
+  }
+
+  strcpy(item, &path[marker]);
+}
+
+static bool is_last_item_equal(char * path, char * spath)
+{
+  char item1[PATH_MAX];
+  get_last_item(path, item1);
+  char item2[PATH_MAX];
+  get_last_item(spath, item2);
+  
+  printf("str1: %s, str2: %s\n", item1, item2);
+
+  return !strcmp(item1, item2);
 }
 
 static int xmp_getattr(const char *path, struct stat *stbuf)
@@ -264,7 +347,7 @@ static int xmp_readdir(const char * path, void * buf, fuse_fill_dir_t filler, of
     char temp_path[PATH_MAX];
     strcpy(temp_path, path);
     char child_path[PATH_MAX];
-    split_path(temp_path, child_path, "RX_");
+    split_path(temp_path, child_path, "A_is_a_");
     if (!strcmp(child_path, "")) {
       is_special = true;
     }
@@ -283,24 +366,24 @@ static int xmp_readdir(const char * path, void * buf, fuse_fill_dir_t filler, of
 
     int res = 0;
     if (!is_special) {
-      if (is_encrypted(path, "/RX_") && strncmp(de->d_name, "A_is_a_", 8)) {
+      if (is_encrypted(path, "/RX_") && strncmp(de->d_name, "A_is_a_", 7)) {
         char item_name[PATH_MAX];
         strcpy(item_name, de->d_name);
         
         printf("item_name: %s\n", item_name);
 
-        en_de_crypt_12(item_name, true);
+        en_de_crypt_12_file(item_name, true);
         
         printf("item_name: %s\n", item_name);
 
         res = (filler(buf, item_name, &st, 0));
-      } else if (is_encrypted(path, "/AtoZ_") && strncmp(de->d_name, "A_is_a_", 8)) {
+      } else if (is_encrypted(path, "/AtoZ_") && strncmp(de->d_name, "A_is_a_", 7)) {
         char item_name[PATH_MAX];
         strcpy(item_name, de->d_name);
         
         printf("item_name: %s\n", item_name);
 
-        en_de_crypt_12(item_name, false);
+        en_de_crypt_12_file(item_name, false);
         
         printf("item_name: %s\n", item_name);
 
@@ -356,6 +439,15 @@ static int xmp_symlink(const char *from, const char *to)
   char dpath[PATH_MAX];
   pass_path(to, dpath, false);
 
+  // if (!is_last_item_equal(fpath, dpath)) {
+  //   char item_name[PATH_MAX];
+  //   get_last_item(fpath, item_name);
+  //   int start_str = (strlen(dpath) - strlen(item_name)) - 1;
+  //   for (int i = start_str; i < strlen(dpath); i++) {
+  //     dpath[i] = item_name[i - start_str];
+  //   }
+  // }
+
 	int res;
 	res = symlink(fpath, dpath);
 	if (res == -1) {
@@ -378,6 +470,15 @@ static int xmp_link(const char *from, const char *to)
 
   char dpath[PATH_MAX];
   pass_path(to, dpath, false);
+
+  // if (!is_last_item_equal(fpath, dpath)) {
+  //   char item_name[PATH_MAX];
+  //   get_last_item(fpath, item_name);
+  //   int start_str = (strlen(dpath) - strlen(item_name)) - 1;
+  //   for (int i = start_str; i < strlen(dpath); i++) {
+  //     dpath[i] = item_name[i - start_str];
+  //   }
+  // }
 
 	int res;
 	res = link(fpath, dpath);
@@ -523,6 +624,15 @@ static int xmp_rename(const char * from, const char * to)
   char dpath[PATH_MAX];
   pass_path(to, dpath, false);
 
+  // if (!is_last_item_equal(fpath, dpath)) {
+  //   char item_name[PATH_MAX];
+  //   get_last_item(fpath, item_name);
+  //   int start_str = (strlen(dpath) - strlen(item_name)) - 1;
+  //   for (int i = start_str; i < strlen(dpath); i++) {
+  //     dpath[i] = item_name[i - start_str];
+  //   }
+  // }
+
 	printf("%s\n", dpath);
 
   int res;
@@ -575,6 +685,54 @@ static int xmp_rmdir(const char * path)
 	return 0;
 }
 
+static int xmp_write(const char *path, const char *buf, size_t size,
+		     off_t offset, struct fuse_file_info *fi)
+{
+	(void) fi;
+	printf("write:\n");
+	printf("%s\n", path);
+
+  char fpath[PATH_MAX];
+  pass_path(path, fpath, true);
+
+	printf("%s\n", fpath);
+
+	int fd;
+	fd = open(fpath, O_WRONLY);
+	if (fd == -1) {
+		return -errno;
+  }
+
+	int res;
+	res = pwrite(fd, buf, size, offset);
+	if (res == -1) {
+		res = -errno;
+  }
+
+	close(fd);
+  write_log("INFO", "WRITE", path, "");
+	return res;
+}
+
+static int xmp_statfs(const char *path, struct statvfs *stbuf)
+{
+	printf("statfs:\n");
+	printf("%s\n", path);
+
+  char fpath[PATH_MAX];
+  pass_path(path, fpath, true);
+
+	printf("%s\n", fpath);
+
+	int res;
+	res = statvfs(fpath, stbuf);
+	if (res == -1)
+		return -errno;
+
+  write_log("INFO", "STATFS", path, "");
+	return 0;
+}
+
 static struct fuse_operations xmp_oper = {
   .access   = xmp_access,
   .getattr  = xmp_getattr,
@@ -587,9 +745,11 @@ static struct fuse_operations xmp_oper = {
   .readlink = xmp_readlink,
 	.rename		= xmp_rename,
 	.rmdir		= xmp_rmdir,
+	.statfs		= xmp_statfs,
   .symlink  = xmp_symlink,
   .truncate = xmp_truncate,
 	.unlink		= xmp_unlink,
+	.write		= xmp_write,
 };
 
 int main(int argc, char *argv[])
